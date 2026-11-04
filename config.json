@@ -1,0 +1,8 @@
+{
+  "diametro_esferas_cm": 8,
+  "separacion_a_cm": 0.25,
+  "temperatura_C": 22,
+  "presion_atm_Cuenca_mmHg": 556,
+  "presion_atm_rango_mmHg": "550-562 (valor usado: punto medio 556)",
+  "conexion": "un_polo_a_tierra"
+}
