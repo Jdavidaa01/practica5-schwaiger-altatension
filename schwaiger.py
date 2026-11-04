@@ -4,6 +4,7 @@ config.json, y genera resultados/ con tablas, graficas y resumen_para_informe.md
 """
 
 import json
+import webbrowser
 from pathlib import Path
 
 import numpy as np
@@ -13,6 +14,7 @@ from matplotlib.ticker import FuncFormatter
 
 BASE_DIR = Path(__file__).resolve().parent
 RESULTADOS_DIR = BASE_DIR / "resultados"
+SIMULADOR_HTML = BASE_DIR / "simulador_schwaiger.html"
 
 # --- Constantes fisicas ---
 KGF_CM2_A_MMHG = 735.559
@@ -338,6 +340,9 @@ def main():
     pd.set_option("display.max_columns", None)
     pd.set_option("display.width", 160)
     print(df_resultados.round(3))
+
+    if SIMULADOR_HTML.exists():
+        webbrowser.open(SIMULADOR_HTML.as_uri())
 
     return df_resultados
 

@@ -27,12 +27,20 @@
 .venv\Scripts\python.exe schwaiger.py
 ```
 
-Esto imprime la tabla de resultados en consola y genera en `resultados/`:
+Esto imprime la tabla de resultados en consola, genera en `resultados/`:
 
 - `resultados.csv` y `resultados.xlsx`
 - `vd_vs_presion_absoluta.png`, `vd_vs_ps.png`, `comparacion_<gas>.png`,
   `error_relativo.png`
 - `resumen_para_informe.md`
+
+y abre automaticamente `simulador_schwaiger.html` en el navegador
+predeterminado: una calculadora interactiva (sliders de diametro,
+separacion, temperatura y presion atmosferica) que recalcula eta, delta
+y los dos metodos de Schwaiger en vivo. Es un archivo HTML autocontenido
+(sin servidor ni conexion a internet necesarios salvo para las
+tipografias); tambien se puede abrir con doble clic sin correr el
+script.
 
 ## Nota sobre los datos de esta corrida
 

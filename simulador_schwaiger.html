@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador Schwaiger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  /* Layout: panel de controles arriba, lecturas clave, grafico de Vd vs presion, tabla de detalle */
+  :root{
+    --bg: #f9f9f7;
+    --surface: #fcfcfb;
+    --surface-2: #f1f0ec;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --accent: #6250d6;
+    --accent-ink: #ffffff;
+    --series-medido: #2a78d6;
+    --series-m1: #eb6834;
+    --series-m2: #1baf7a;
+    --good: #0ca30c;
+    --warning: #c98100;
+    --critical: #d03b3b;
+    --stripe-a: #f2b705;
+    --stripe-b: #1a1a19;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg: #0d0d0d;
+      --surface: #1a1a19;
+      --surface-2: #232320;
+      --ink: #f0efec;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255,255,255,0.10);
+      --accent: #9085e9;
+      --accent-ink: #14121f;
+      --series-medido: #3987e5;
+      --series-m1: #d95926;
+      --series-m2: #199e70;
+      --good: #0ca30c;
+      --warning: #e5a400;
+      --critical: #e66767;
+      --stripe-a: #c98500;
+      --stripe-b: #000000;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #232320;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255,255,255,0.10);
+    --accent: #9085e9;
+    --accent-ink: #14121f;
+    --series-medido: #3987e5;
+    --series-m1: #d95926;
+    --series-m2: #199e70;
+    --good: #0ca30c;
+    --warning: #e5a400;
+    --critical: #e66767;
+    --stripe-a: #c98500;
+    --stripe-b: #000000;
+    color-scheme: dark;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .wrap{ max-width: 920px; margin: 0 auto; padding-block: 28px 56px; display:flex; flex-direction:column; gap:20px; }
+
+  header{ display:flex; flex-direction:column; gap:10px; }
+  .eyebrow{
+    font-family:"IBM Plex Mono", monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color: var(--muted);
+  }
+  h1{
+    font-family:"Big Shoulders Display", sans-serif; font-weight:800; font-stretch:condensed;
+    font-size: clamp(32px, 7vw, 52px); line-height:.92; margin:0; letter-spacing:.01em; text-wrap:balance;
+  }
+  .lede{ color:var(--ink-2); font-size:14.5px; max-width:62ch; line-height:1.55; margin:0; }
+  .stripe{
+    height:6px; border-radius:3px; margin-top:4px;
+    background: repeating-linear-gradient(135deg, var(--stripe-a) 0 10px, var(--stripe-b) 10px 20px);
+    opacity:.85;
+  }
+
+  .panel{
+    background: var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px;
+  }
+  .panel h2{
+    font-family:"IBM Plex Mono", monospace; font-size:11.5px; letter-spacing:.1em; text-transform:uppercase;
+    color: var(--muted); margin:0 0 16px 0; font-weight:600;
+  }
+
+  .controls{ display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap:18px 24px; }
+  .field{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .field label{ font-size:12.5px; color:var(--ink-2); display:flex; justify-content:space-between; gap:8px; }
+  .field label .val{ font-family:"IBM Plex Mono", monospace; color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; }
+  input[type=range]{ accent-color: var(--accent); width:100%; height:22px; }
+  select{
+    font-family:"IBM Plex Sans", sans-serif; font-size:13.5px; padding:8px 10px; border-radius:8px;
+    border:1px solid var(--border); background:var(--surface-2); color:var(--ink);
+  }
+
+  .readouts{ display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:14px; }
+  .tile{ background:var(--surface-2); border-radius:10px; padding:12px 14px; min-width:0; }
+  .tile .k{ font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .tile .v{
+    font-family:"Big Shoulders Display", sans-serif; font-weight:700; font-size:26px; line-height:1.1;
+    margin-top:2px; font-variant-numeric:tabular-nums;
+  }
+  .tile .v small{ font-family:"IBM Plex Mono", monospace; font-size:13px; font-weight:500; color:var(--ink-2); }
+  .badge{
+    display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; padding:4px 10px;
+    border-radius:999px; font-family:"IBM Plex Mono", monospace;
+  }
+  .badge.good{ background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+  .badge.critical{ background: color-mix(in srgb, var(--critical) 16%, transparent); color: var(--critical); }
+
+  .chart-head{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+  .legend{ display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:var(--ink-2); }
+  .legend .item{ display:flex; align-items:center; gap:6px; }
+  .legend .dot{ width:10px; height:10px; border-radius:3px; display:inline-block; }
+
+  .chart-box{ position:relative; }
+  svg.chart{ width:100%; height:auto; display:block; overflow:visible; }
+  .axis-label{ font-family:"IBM Plex Mono", monospace; font-size:10.5px; fill:var(--muted); }
+  .grid-line{ stroke:var(--grid); stroke-width:1; }
+  .baseline{ stroke:var(--baseline); stroke-width:1; }
+  .crosshair{ stroke:var(--muted); stroke-width:1; stroke-dasharray:3 3; opacity:0; pointer-events:none; }
+
+  .tooltip{
+    position:absolute; pointer-events:none; background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; padding:8px 10px; font-family:"IBM Plex Mono", monospace; font-size:11.5px;
+    box-shadow:0 6px 18px rgba(0,0,0,.18); opacity:0; transform:translate(-50%,-110%); transition:opacity .08s;
+    white-space:nowrap; z-index:5;
+  }
+  .tooltip .row{ display:flex; gap:8px; justify-content:space-between; }
+  .tooltip .row + .row{ margin-top:2px; }
+  .tooltip .sw{ width:8px; height:8px; border-radius:2px; display:inline-block; margin-right:5px; }
+
+  table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  thead th{
+    text-align:right; font-family:"IBM Plex Mono", monospace; font-size:10.5px; letter-spacing:.04em;
+    text-transform:uppercase; color:var(--muted); font-weight:600; padding:0 8px 8px; border-bottom:1px solid var(--baseline);
+  }
+  thead th:first-child, tbody td:first-child{ text-align:left; }
+  tbody td{
+    text-align:right; padding:7px 8px; font-family:"IBM Plex Mono", monospace; font-variant-numeric:tabular-nums;
+    border-bottom:1px solid var(--grid);
+  }
+  tbody tr:last-child td{ border-bottom:none; }
+  .err-good{ color:var(--good); }
+  .err-warn{ color:var(--warning); }
+  .err-bad{ color:var(--critical); }
+  .table-scroll{ overflow-x:auto; }
+
+  .note{ font-size:12px; color:var(--muted); line-height:1.6; }
+  .note strong{ color:var(--ink-2); }
+  .warn-line{ font-size:12.5px; color: var(--warning); margin-top:10px; display:flex; gap:6px; align-items:flex-start; }
+
+  footer{ font-size:12px; color:var(--muted); line-height:1.6; padding-top:4px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Alta tensi&oacute;n &middot; Pr&aacute;ctica 5 &middot; M&eacute;todo de Schwaiger</span>
+    <h1>Simulador Schwaiger</h1>
+    <p class="lede">Ajuste la geometr&iacute;a de las esferas y las condiciones ambientales para ver c&oacute;mo cambian el factor de utilizaci&oacute;n &eta;, la densidad relativa &delta; y la tensi&oacute;n de ruptura calculada frente a lo medido en la pr&aacute;ctica.</p>
+    <div class="stripe" aria-hidden="true"></div>
+  </header>
+
+  <section class="panel">
+    <h2>Par&aacute;metros</h2>
+    <div class="controls">
+      <div class="field">
+        <label for="gas">Gas <span class="val" id="gasVal">Aire seco</span></label>
+        <select id="gas">
+          <option value="aire_seco">Aire seco</option>
+          <option value="aire_humedo">Aire h&uacute;medo</option>
+          <option value="N2">Nitr&oacute;geno (N&#8322;)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="conexion">Conexi&oacute;n <span class="val" id="conexionVal">Un polo a tierra</span></label>
+        <select id="conexion">
+          <option value="up">Un polo a tierra</option>
+          <option value="sim">Sim&eacute;trica</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="diametro">Di&aacute;metro esferas <span class="val"><span id="diametroVal">8,0</span>&nbsp;cm</span></label>
+        <input type="range" id="diametro" min="2" max="20" step="0.5" value="8">
+      </div>
+      <div class="field">
+        <label for="separacion">Separaci&oacute;n a <span class="val"><span id="separacionVal">0,25</span>&nbsp;cm</span></label>
+        <input type="range" id="separacion" min="0.05" max="6" step="0.05" value="0.25">
+      </div>
+      <div class="field">
+        <label for="temperatura">Temperatura <span class="val"><span id="temperaturaVal">22,0</span>&nbsp;&deg;C</span></label>
+        <input type="range" id="temperatura" min="-10" max="40" step="0.5" value="22">
+      </div>
+      <div class="field">
+        <label for="presion">Presi&oacute;n atm. (Cuenca) <span class="val"><span id="presionVal">556</span>&nbsp;mmHg</span></label>
+        <input type="range" id="presion" min="500" max="760" step="1" value="556">
+      </div>
+    </div>
+  </section>
+
+  <section class="readouts">
+    <div class="tile">
+      <div class="k">p = (a+r)/r</div>
+      <div class="v" id="pGeomOut">&mdash;</div>
+    </div>
+    <div class="tile">
+      <div class="k">&eta; aplicada</div>
+      <div class="v" id="etaOut">&mdash;</div>
+    </div>
+    <div class="tile">
+      <div class="k">&eta; sim&eacute;trica</div>
+      <div class="v" id="etaSimOut">&mdash;</div>
+    </div>
+    <div class="tile">
+      <div class="k">Criterio a &le; D/2</div>
+      <div class="v" style="font-size:16px; margin-top:8px;"><span class="badge" id="criterioBadge">&mdash;</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="chart-head">
+      <h2 style="margin:0;">Vd medido vs. calculado</h2>
+      <div class="legend">
+        <span class="item"><span class="dot" style="background:var(--series-medido)"></span>Vd medido</span>
+        <span class="item"><span class="dot" style="background:var(--series-m1)"></span>M&eacute;todo 1</span>
+        <span class="item"><span class="dot" style="background:var(--series-m2)"></span>M&eacute;todo 2</span>
+      </div>
+    </div>
+    <div class="chart-box" id="chartBox">
+      <svg class="chart" id="chart" viewBox="0 0 640 340" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Detalle por presi&oacute;n</h2>
+    <div class="table-scroll">
+      <table id="detailTable">
+        <thead>
+          <tr>
+            <th>p man.<br>(kg/cm&sup2;)</th>
+            <th>p abs.<br>(bar)</th>
+            <th>&delta;</th>
+            <th>Vd medido<br>(kV)</th>
+            <th>M&eacute;todo 1<br>(kV)</th>
+            <th>M&eacute;todo 2<br>(kV)</th>
+            <th>Error 1<br>(%)</th>
+            <th>Error 2<br>(%)</th>
+          </tr>
+        </thead>
+        <tbody id="detailBody"></tbody>
+      </table>
+    </div>
+    <div id="deltaWarn"></div>
+  </section>
+
+  <footer>
+    <strong>Nota:</strong> los Vd medidos provienen del ensayo de referencia (esferas &oslash;4,5&nbsp;cm, separaci&oacute;n 1,1&nbsp;cm); la geometr&iacute;a de los controles corresponde a este trabajo. Al usar una separaci&oacute;n distinta a la del ensayo original, los m&eacute;todos de Schwaiger no reproducir&aacute;n exactamente lo medido &mdash; esta herramienta sirve para explorar la sensibilidad del c&aacute;lculo a cada par&aacute;metro, no para validar el ensayo.
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var DATA = {
+    aire_seco: [
+      {p_man:3.5, vd:[99.8,101.8,104.2]},
+      {p_man:3.0, vd:[93.2,92.8,93.0]},
+      {p_man:2.5, vd:[80.0,80.6,79.7]},
+      {p_man:2.0, vd:[73.0,72.1,72.8]},
+      {p_man:1.5, vd:[60.2,58.7,58.3]}
+    ],
+    aire_humedo: [
+      {p_man:3.0, vd:[93.5,93.0,96.7]},
+      {p_man:2.5, vd:[81.0,82.0,83.3]},
+      {p_man:2.0, vd:[73.2,74.4,72.4]},
+      {p_man:1.5, vd:[66.0,68.0,68.3]},
+      {p_man:1.0, vd:[58.1,64.7,61.6,68.0,69.7]}
+    ],
+    N2: [
+      {p_man:3.0, vd:[94.2,93.0,93.3]},
+      {p_man:2.5, vd:[82.8,86.5,86.5]},
+      {p_man:2.0, vd:[71.4,71.1,72.0]},
+      {p_man:1.5, vd:[68.7,64.0,73.1]},
+      {p_man:1.0, vd:[66.0,58.0,59.0]}
+    ]
+  };
+
+  var ED0 = { aire_seco:32, aire_humedo:32, N2:35 };
+  var KGF_CM2_A_MMHG = 735.559;
+  var BAR_A_MMHG = 750.062;
+
+  var TABLA = [
+    {p:1,  sim:100.0, up:100.0},
+    {p:1.5,sim:85.0,  up:83.4},
+    {p:2,  sim:73.2,  up:66.0},
+    {p:3,  sim:56.3,  up:42.8},
+    {p:4,  sim:44.9,  up:30.8},
+    {p:5,  sim:37.2,  up:23.8},
+    {p:6,  sim:31.8,  up:19.3},
+    {p:7,  sim:27.6,  up:16.3},
+    {p:8,  sim:24.4,  up:14.0},
+    {p:9,  sim:21.8,  up:12.3},
+    {p:10, sim:19.7,  up:11.0},
+    {p:15, sim:13.3,  up:null},
+    {p:20, sim:10.0,  up:null}
+  ];
+
+  function fmt(n, dec){
+    return n.toLocaleString("es-EC", {minimumFractionDigits:dec, maximumFractionDigits:dec});
+  }
+
+  function interp(pGeom, key){
+    var pts = TABLA.filter(function(r){ return r[key] !== null; });
+    if (pGeom <= pts[0].p) return pts[0][key];
+    if (pGeom >= pts[pts.length-1].p) return pts[pts.length-1][key];
+    for (var i=0;i<pts.length-1;i++){
+      var a=pts[i], b=pts[i+1];
+      if (pGeom>=a.p && pGeom<=b.p){
+        var t=(pGeom-a.p)/(b.p-a.p);
+        return a[key]+t*(b[key]-a[key]);
+      }
+    }
+  }
+
+  function densidadRelativa(pAbsMmHg, tC){ return 0.386*pAbsMmHg/(273+tC); }
+  function promedio(arr){ return arr.reduce(function(a,b){return a+b;},0)/arr.length; }
+
+  function metodo1(delta, ed0, aCm, etaFrac){ return delta*ed0*aCm*etaFrac; }
+  function metodo2(delta, aCm, etaFrac, gas){
+    var alpha = aCm*etaFrac;
+    var vd = 24.22*delta*alpha + 6.08*Math.sqrt(delta*alpha);
+    if (gas === "N2") vd *= 35/32;
+    return vd;
+  }
+  function errorPct(calc, med){ return Math.abs(calc-med)/med*100; }
+
+  var els = {
+    gas: document.getElementById("gas"),
+    conexion: document.getElementById("conexion"),
+    diametro: document.getElementById("diametro"),
+    separacion: document.getElementById("separacion"),
+    temperatura: document.getElementById("temperatura"),
+    presion: document.getElementById("presion")
+  };
+
+  var out = {
+    gasVal: document.getElementById("gasVal"),
+    conexionVal: document.getElementById("conexionVal"),
+    diametroVal: document.getElementById("diametroVal"),
+    separacionVal: document.getElementById("separacionVal"),
+    temperaturaVal: document.getElementById("temperaturaVal"),
+    presionVal: document.getElementById("presionVal"),
+    pGeomOut: document.getElementById("pGeomOut"),
+    etaOut: document.getElementById("etaOut"),
+    etaSimOut: document.getElementById("etaSimOut"),
+    criterioBadge: document.getElementById("criterioBadge"),
+    detailBody: document.getElementById("detailBody"),
+    deltaWarn: document.getElementById("deltaWarn"),
+    chart: document.getElementById("chart"),
+    tooltip: document.getElementById("tooltip"),
+    chartBox: document.getElementById("chartBox")
+  };
+
+  var GAS_LABEL = { aire_seco:"Aire seco", aire_humedo:"Aire húmedo", N2:"Nitrógeno (N₂)" };
+
+  var currentRows = [];
+
+  function compute(){
+    var gas = els.gas.value;
+    var conexion = els.conexion.value;
+    var diametro = parseFloat(els.diametro.value);
+    var separacion = parseFloat(els.separacion.value);
+    var temperatura = parseFloat(els.temperatura.value);
+    var presionAtm = parseFloat(els.presion.value);
+
+    out.gasVal.textContent = GAS_LABEL[gas];
+    out.conexionVal.textContent = conexion === "sim" ? "Simétrica" : "Un polo a tierra";
+    out.diametroVal.textContent = fmt(diametro,1);
+    out.separacionVal.textContent = fmt(separacion,2);
+    out.temperaturaVal.textContent = fmt(temperatura,1);
+    out.presionVal.textContent = fmt(presionAtm,0);
+
+    var radio = diametro/2;
+    var pGeom = (separacion+radio)/radio;
+    var etaAplicadaPct = interp(pGeom, conexion);
+    var etaSimPct = interp(pGeom, "sim");
+    var etaFrac = etaAplicadaPct/100;
+    var cumple = separacion <= radio;
+
+    out.pGeomOut.textContent = fmt(pGeom,3);
+    out.etaOut.innerHTML = fmt(etaAplicadaPct,1) + "<small>%</small>";
+    out.etaSimOut.innerHTML = fmt(etaSimPct,1) + "<small>%</small>";
+    out.criterioBadge.textContent = cumple ? "Cumple" : "No cumple";
+    out.criterioBadge.className = "badge " + (cumple ? "good" : "critical");
+
+    var rows = DATA[gas].map(function(r){
+      var pManMmHg = r.p_man*KGF_CM2_A_MMHG;
+      var pAbsMmHg = presionAtm + pManMmHg;
+      var pAbsBar = pAbsMmHg/BAR_A_MMHG;
+      var delta = densidadRelativa(pAbsMmHg, temperatura);
+      var vdMed = promedio(r.vd);
+      var vd1 = metodo1(delta, ED0[gas], separacion, etaFrac);
+      var vd2 = metodo2(delta, separacion, etaFrac, gas);
+      return {
+        pMan: r.p_man, pAbsBar: pAbsBar, delta: delta,
+        vdMed: vdMed, vd1: vd1, vd2: vd2,
+        e1: errorPct(vd1, vdMed), e2: errorPct(vd2, vdMed)
+      };
+    });
+
+    rows.sort(function(a,b){ return a.pAbsBar - b.pAbsBar; });
+    currentRows = rows;
+    renderTable(rows);
+    renderChart(rows);
+  }
+
+  function errClass(e){
+    if (e <= 10) return "err-good";
+    if (e <= 30) return "err-warn";
+    return "err-bad";
+  }
+
+  function renderTable(rows){
+    var html = "";
+    var deltaOut = [];
+    rows.forEach(function(r){
+      if (r.delta < 2 || r.delta > 8) deltaOut.push(r.pMan);
+      html += "<tr>" +
+        "<td>"+fmt(r.pMan,1)+"</td>" +
+        "<td>"+fmt(r.pAbsBar,3)+"</td>" +
+        "<td>"+fmt(r.delta,3)+"</td>" +
+        "<td>"+fmt(r.vdMed,1)+"</td>" +
+        "<td>"+fmt(r.vd1,1)+"</td>" +
+        "<td>"+fmt(r.vd2,1)+"</td>" +
+        "<td class=\""+errClass(r.e1)+"\">"+fmt(r.e1,1)+"</td>" +
+        "<td class=\""+errClass(r.e2)+"\">"+fmt(r.e2,1)+"</td>" +
+        "</tr>";
+    });
+    out.detailBody.innerHTML = html;
+    out.deltaWarn.innerHTML = deltaOut.length
+      ? "<div class=\"warn-line\">&#9888; &delta; fuera del rango esperado (2&ndash;8) en p man. = " + deltaOut.map(function(p){return fmt(p,1);}).join(", ") + " kg/cm&sup2;. Revisar unidades de presión.</div>"
+      : "";
+  }
+
+  var PAD = {l:44, r:18, t:14, b:34};
+  var VB_W = 640, VB_H = 340;
+
+  function renderChart(rows){
+    var svg = out.chart;
+    svg.innerHTML = "";
+    if (!rows.length) return;
+
+    var xs = rows.map(function(r){ return r.pAbsBar; });
+    var allY = [];
+    rows.forEach(function(r){ allY.push(r.vdMed, r.vd1, r.vd2); });
+    var xMin = Math.min.apply(null, xs), xMax = Math.max.apply(null, xs);
+    if (xMin === xMax){ xMin -= 0.5; xMax += 0.5; }
+    var yMax = Math.max.apply(null, allY.concat([1]));
+    var yMin = 0;
+    var xPad = (xMax-xMin)*0.08;
+    xMin -= xPad; xMax += xPad;
+    yMax *= 1.15;
+
+    function X(v){ return PAD.l + (v-xMin)/(xMax-xMin) * (VB_W-PAD.l-PAD.r); }
+    function Y(v){ return (VB_H-PAD.b) - (v-yMin)/(yMax-yMin) * (VB_H-PAD.b-PAD.t); }
+
+    var ns = "http://www.w3.org/2000/svg";
+    function el(tag, attrs){
+      var e = document.createElementNS(ns, tag);
+      for (var k in attrs) e.setAttribute(k, attrs[k]);
+      return e;
+    }
+
+    // gridlines + y ticks
+    var yTicks = 5;
+    for (var i=0;i<=yTicks;i++){
+      var yv = yMax*i/yTicks;
+      var yy = Y(yv);
+      svg.appendChild(el("line",{x1:PAD.l,x2:VB_W-PAD.r,y1:yy,y2:yy,class:"grid-line"}));
+      var t = el("text",{x:PAD.l-8,y:yy+3,class:"axis-label","text-anchor":"end"});
+      t.textContent = fmt(yv,0);
+      svg.appendChild(t);
+    }
+    svg.appendChild(el("line",{x1:PAD.l,x2:PAD.l,y1:PAD.t,y2:VB_H-PAD.b,class:"baseline"}));
+    svg.appendChild(el("line",{x1:PAD.l,x2:VB_W-PAD.r,y1:VB_H-PAD.b,y2:VB_H-PAD.b,class:"baseline"}));
+
+    rows.forEach(function(r){
+      var xx = X(r.pAbsBar);
+      var t = el("text",{x:xx,y:VB_H-PAD.b+18,class:"axis-label","text-anchor":"middle"});
+      t.textContent = fmt(r.pAbsBar,2);
+      svg.appendChild(t);
+    });
+
+    var xLabel = el("text",{x:(PAD.l+VB_W-PAD.r)/2,y:VB_H-2,class:"axis-label","text-anchor":"middle"});
+    xLabel.textContent = "Presión absoluta (bar)";
+    svg.appendChild(xLabel);
+    var yLabel = el("text",{x:-(VB_H/2),y:14,class:"axis-label","text-anchor":"middle",transform:"rotate(-90)"});
+    yLabel.textContent = "Vd (kV)";
+    svg.appendChild(yLabel);
+
+    function series(key, color, markerR){
+      var pts = rows.map(function(r){ return [X(r.pAbsBar), Y(r[key])]; });
+      var d = pts.map(function(p,i){ return (i===0?"M":"L")+p[0].toFixed(2)+","+p[1].toFixed(2); }).join(" ");
+      svg.appendChild(el("path",{d:d, fill:"none", stroke:color, "stroke-width":2, "stroke-linecap":"round", "stroke-linejoin":"round"}));
+      pts.forEach(function(p){
+        svg.appendChild(el("circle",{cx:p[0], cy:p[1], r:markerR, fill:color, class:"mk-"+key, stroke:"var(--surface)", "stroke-width":1.5}));
+      });
+      var last = pts[pts.length-1];
+      return last;
+    }
+
+    var lastMed = series("vdMed", "var(--series-medido)", 4.5);
+    var lastM1 = series("vd1", "var(--series-m1)", 4);
+    var lastM2 = series("vd2", "var(--series-m2)", 4);
+
+    function directLabel(pos, text, color){
+      var tag = el("text",{x:pos[0]+8, y:pos[1]+4, "font-family":"IBM Plex Mono, monospace", "font-size":10.5, fill:color, "font-weight":600});
+      tag.textContent = text;
+      svg.appendChild(tag);
+    }
+    directLabel(lastMed, "medido", "var(--series-medido)");
+    directLabel(lastM1, "método 1", "var(--series-m1)");
+    directLabel(lastM2, "método 2", "var(--series-m2)");
+
+    var crosshair = el("line",{x1:0,x2:0,y1:PAD.t,y2:VB_H-PAD.b,class:"crosshair"});
+    svg.appendChild(crosshair);
+
+    var overlay = el("rect",{x:PAD.l,y:PAD.t,width:VB_W-PAD.l-PAD.r,height:VB_H-PAD.t-PAD.b,fill:"transparent"});
+    svg.appendChild(overlay);
+
+    function nearestIndex(mx){
+      var best=0, bestD=Infinity;
+      rows.forEach(function(r,i){
+        var dx = Math.abs(X(r.pAbsBar)-mx);
+        if (dx<bestD){ bestD=dx; best=i; }
+      });
+      return best;
+    }
+
+    function showTooltip(evt){
+      var rect = svg.getBoundingClientRect();
+      var clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+      var clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+      var mx = (clientX-rect.left) / rect.width * VB_W;
+      var idx = nearestIndex(mx);
+      var r = rows[idx];
+      var xx = X(r.pAbsBar);
+      crosshair.setAttribute("x1", xx); crosshair.setAttribute("x2", xx);
+      crosshair.style.opacity = 1;
+
+      var tip = out.tooltip;
+      tip.innerHTML =
+        "<div style=\"margin-bottom:4px;color:var(--muted)\">p abs. = "+fmt(r.pAbsBar,2)+" bar</div>" +
+        "<div class=\"row\"><span><span class=\"sw\" style=\"background:var(--series-medido)\"></span>medido</span><strong>"+fmt(r.vdMed,1)+" kV</strong></div>" +
+        "<div class=\"row\"><span><span class=\"sw\" style=\"background:var(--series-m1)\"></span>método 1</span><strong>"+fmt(r.vd1,1)+" kV</strong></div>" +
+        "<div class=\"row\"><span><span class=\"sw\" style=\"background:var(--series-m2)\"></span>método 2</span><strong>"+fmt(r.vd2,1)+" kV</strong></div>";
+
+      var boxRect = out.chartBox.getBoundingClientRect();
+      var px = (clientX - boxRect.left);
+      var py = (xx/VB_W)*0 + (Y(r.vdMed)/VB_H)*boxRect.height;
+      tip.style.left = (xx/VB_W*boxRect.width) + "px";
+      tip.style.top = Math.max(20, py) + "px";
+      tip.style.opacity = 1;
+    }
+    function hideTooltip(){
+      crosshair.style.opacity = 0;
+      out.tooltip.style.opacity = 0;
+    }
+
+    overlay.addEventListener("mousemove", showTooltip);
+    overlay.addEventListener("mouseleave", hideTooltip);
+    overlay.addEventListener("touchstart", showTooltip, {passive:true});
+    overlay.addEventListener("touchmove", showTooltip, {passive:true});
+    overlay.addEventListener("touchend", hideTooltip);
+  }
+
+  Object.keys(els).forEach(function(k){ els[k].addEventListener("input", compute); });
+  compute();
+})();
+</script>
+</body>
+</html>
